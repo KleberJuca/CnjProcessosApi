@@ -42,6 +42,7 @@ public class CnjClient : ICnjClient
             }
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
+            // Map simplificado (ajuste conforme schema DataJud)
             var proc = new Processo
             {
                 NumeroCNJ = numeroCnj,

@@ -18,6 +18,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(p => p.NumeroCNJ).IsUnique();
             entity.Property(p => p.NumeroCNJ).IsRequired();
             entity.Property(p => p.IsSigiloso).HasDefaultValue(false);
+            entity.Property(p => p.NomePartesAnonimizados).HasMaxLength(512);
             entity.HasMany(p => p.Movimentacoes)
                   .WithOne(m => m.Processo)
                   .HasForeignKey(m => m.ProcessoId)

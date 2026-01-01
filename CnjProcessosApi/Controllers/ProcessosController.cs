@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CnjProcessosApi.Core.Interfaces;
 
@@ -18,29 +17,27 @@ public class ProcessosController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize]
     public async Task<IActionResult> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? filtro = null, CancellationToken ct = default)
     {
         var (items, total) = await _service.GetListaAsync(page, pageSize, filtro, ct);
-        return Ok(new { total, items });
+        var disclaimer = _config["Legal:Disclaimer"] ?? "Dados do DataJud 'as is'. Uso gratuito e não comercial conforme termos do CNJ.";
+        return Ok(new { total, items, disclaimer });
     }
 
     [HttpGet("{numeroCNJ}")]
-    [Authorize]
     public async Task<IActionResult> GetByNumero(string numeroCNJ, CancellationToken ct)
     {
         var item = await _service.GetDetalheAsync(numeroCNJ, ct);
-        if (item == null) return NotFound();
+        if (item == null) return NotFound(new { message = "Processo não encontrado ou não disponível", disclaimer = _config["Legal:Disclaimer"] });
         return Ok(item);
     }
 
     [HttpPost("sync")]
-    [Authorize]
     public async Task<IActionResult> Sync(CancellationToken ct)
     {
-        var numeros = _config.GetSection("Processos:NumerosCNJ").Get<string[]>() ?? Array.Empty<string>();
+        var numeros = _config.GetSection("Processos:NumerosCNJ").GetChildren().Select(c => c.Value ?? string.Empty).Where(v => !string.IsNullOrWhiteSpace(v)).ToArray();
         var endpoint = _config["DataJud:TribunalEndpoint"] ?? "api_publica_tjsp/_search";
         await _service.SyncAsync(numeros, endpoint, ct);
-        return Ok(new { message = "Sincronização iniciada" });
+        return Ok(new { message = "Sincronização solicitada", disclaimer = _config["Legal:Disclaimer"] });
     }
 }

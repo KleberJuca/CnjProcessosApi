@@ -1,0 +1,12 @@
+@page
+@model CnjProcessosApi.Pages.IndexModel
+@{
+    ViewData["Title"] = "Consulta Pública de Processos";
+}
+<h1>Consulta Pública de Processos</h1>
+<p>Dados do DataJud 'as is'. Uso gratuito e não comercial conforme termos do CNJ.</p>
+<form method="get" action="/api/processos">
+    <label for="numero">Número CNJ:</label>
+    <input id="numero" name="filtro" type="text" placeholder="0000000-00.0000.0.00.0000" />
+    <button type="submit">Consultar</button>
+</form>

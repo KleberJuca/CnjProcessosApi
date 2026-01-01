@@ -1,7 +1,6 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using Serilog;
 using CnjProcessosApi.Infrastructure.Persistence;
@@ -11,9 +10,9 @@ using CnjProcessosApi.Infrastructure.Repositories;
 using CnjProcessosApi.Core.Services;
 using CnjProcessosApi.Infrastructure.Jobs;
 using Polly.Extensions.Http;
-using Polly;
 using System.Net;
-using Microsoft.Extensions.Http;
+using CnjProcessosApi.Middleware;
+using Polly; // add polly root namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,8 +22,9 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 builder.Host.UseSerilog();
 
-// Controllers
+// Controllers + Razor Pages (frontend simples)
 builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 
 // EF Core SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -43,16 +43,13 @@ builder.Services.AddHttpClient<ICnjClient, CnjClient>(client =>
 .AddPolicyHandler(HttpPolicyExtensions
     .HandleTransientHttpError()
     .OrResult(r => r.StatusCode == HttpStatusCode.TooManyRequests)
-    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))))
-.AddPolicyHandler(HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))));
 
 // Repositories & Services
 builder.Services.AddScoped<IProcessoRepository, ProcessoRepository>();
 builder.Services.AddScoped<IProcessoService, ProcessoService>();
 
-// Quartz
+// Quartz (diário)
 builder.Services.AddQuartz(q =>
 {
     q.UseMicrosoftDependencyInjectionJobFactory();
@@ -60,7 +57,7 @@ builder.Services.AddQuartz(q =>
     var jobKey = new JobKey("ProcessoSyncJob");
     q.AddJob<ProcessoSyncJob>(opts => opts.WithIdentity(jobKey));
 
-    var cron = builder.Configuration["Quartz:SyncIntervalCron"] ?? "0 0 */4 * * ?";
+    var cron = builder.Configuration["Quartz:SyncIntervalCron"] ?? "0 0 0 * * ?";
     q.AddTrigger(opts => opts
         .ForJob(jobKey)
         .WithIdentity("ProcessoSyncJob-trigger")
@@ -71,51 +68,27 @@ builder.Services.AddQuartzHostedService(options =>
     options.WaitForJobsToComplete = true;
 });
 
-// Authentication JWT
-var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "";
-var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
+// Rate Limiting por IP (120/min)
+var permitLimit = builder.Configuration.GetValue<int>("RateLimiting:PermitLimitPerMinute", 120);
+builder.Services.AddRateLimiter(_ =>
+    _.AddPolicy("per-ip", context =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = key
-    };
-});
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        });
+    })
+);
 
-// Authorization
-builder.Services.AddAuthorization();
-
-// Swagger + JWT support
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "CnjProcessos API", Version = "v1" });
-    var securityScheme = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "JWT Authorization header"
-    };
-    c.AddSecurityDefinition("Bearer", securityScheme);
-    var securityReq = new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
-        { securityScheme, new List<string>() }
-    };
-    c.AddSecurityRequirement(securityReq);
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "CnjProcessos API Pública", Version = "v1" });
 });
 
 // HealthChecks
@@ -126,15 +99,24 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        var terms = builder.Configuration["Legal:TermsOfUseUrl"] ?? "";
+        options.DocumentTitle = "CnjProcessos API Pública (Uso não comercial)";
+        if (!string.IsNullOrWhiteSpace(terms))
+        {
+            // Swagger banner via description could be added in OpenApiInfo
+        }
+    });
 }
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseLegalCompliance();
+app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("per-ip");
+app.MapRazorPages().RequireRateLimiting("per-ip");
 
 app.Run();
