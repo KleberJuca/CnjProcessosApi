@@ -1,0 +1,6 @@
+@CnjProcessosApi_HostAddress = http://localhost:5038
+
+GET {{CnjProcessosApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
