@@ -1,71 +1,76 @@
 # CnjProcessosApi
 
-API RESTful em .NET 8 para escritÛrio de advocacia, integrando com a API P˙blica do DataJud (CNJ) para metadados de processos. Arquitetura Clean com projetos Core, Infrastructure e Web.
+API RESTful p√∫blica e gratuita em .NET 8 para consulta de metadados de processos judiciais p√∫blicos via API P√∫blica do DataJud (CNJ). Arquitetura Clean com projetos Core, Infrastructure e Web.
+
+> Aviso Legal Importante
+>
+> - O consumo da API P√∫blica do DataJud implica aceita√ß√£o t√°cita e integral do Termo de Uso do CNJ (cl√°usula 1.2).
+> - Uso estritamente legal, n√£o comercial e autorizado. Uso comercial √© proibido (cl√°usulas 3.3 e 3.8).
+> - O CNJ n√£o garante precis√£o, integridade ou atualidade dos dados (cl√°usula 3.6). Dados fornecidos "as is".
+> - O usu√°rio √© respons√°vel por qualquer informa√ß√£o derivada (cl√°usula 3.2) e deve dar ci√™ncia ao CNJ sobre publica√ß√µes ao p√∫blico (cl√°usula 3.9).
+> - Limite de 120 requisi√ß√µes/minuto por IP (cl√°usula 3.13). Esta API aplica rate limiting.
+> - Sigilo: processos restritos retornam erro sem vazamento (cl√°usula 3.19).
+> - Termo de Uso: https://datajud-wiki.cnj.jus.br/api-publica/termo-de-uso
 
 ## Tecnologias
-- ASP.NET Core 8 (Controllers, Swagger, Health Checks)
-- Entity Framework Core + SQLite (cache local)
-- HttpClient + Polly (retry/circuit breaker)
-- JWT Bearer Authentication
-- Quartz.NET (jobs em background)
+- ASP.NET Core 8 (Controllers, Razor Pages, Swagger, Health Checks)
+- Entity Framework Core + SQLite (cache local somente de metadados p√∫blicos)
+- HttpClient + Polly (retry leve)
+- Quartz.NET (job di√°rio)
 - Serilog (console + arquivo)
+- Rate Limiting (AspNetCore.RateLimiting)
 
-## Endpoints principais
-- POST `api/auth/login` ? Autentica e retorna JWT (exemplo padr„o admin/admin).
-- GET `api/processos` ? Lista paginada de processos do escritÛrio com ˙ltima movimentaÁ„o.
-- GET `api/processos/{numeroCNJ}` ? Detalhe do processo + ˙ltima movimentaÁ„o.
-- POST `api/processos/sync` ? ForÁa sincronizaÁ„o manual com CNJ.
-- GET `health` ? Health checks.
+## Endpoints principais (p√∫blicos)
+- GET `api/processos` ‚Äì Lista paginada de processos com √∫ltima movimenta√ß√£o e `Disclaimer`.
+- GET `api/processos/{numeroCNJ}` ‚Äì Detalhe do processo + √∫ltima movimenta√ß√£o com `Disclaimer`.
+- POST `api/processos/sync` ‚Äì Solicita sincroniza√ß√£o manual com CNJ (pode ser usado com crit√©rio; sujeito a rate limit).
+- GET `health` ‚Äì Health checks.
+- Frontend: `Pages/Index.cshtml` ‚Äì Consulta simples para cidad√£os.
 
-Todos os endpoints em `api/processos` exigem JWT.
+Todos os endpoints s√£o p√∫blicos e sujeitos a rate limiting (120 req/min/IP).
 
 ## Requisitos da API DataJud (CNJ)
 - Base URL: https://api-publica.datajud.cnj.jus.br/
-- Cada tribunal possui endpoint `_search` especÌfico (ex.: `api_publica_tjsp/_search`).
-- AutenticaÁ„o: Header `Authorization: APIKey {SUA_CHAVE}`.
-- Consulta: `POST` com corpo no formato de query Elasticsearch JSON.
-- Retorno: Metadados de processos p˙blicos (classe, assunto, Ûrg„o, movimentaÁıes).
-- LimitaÁıes: Processos sigilosos retornam 403/404 ou n„o aparecem.
+- Endpoint por tribunal: `_search` (ex.: `api_publica_tjsp/_search`).
+- Autentica√ß√£o: Header `Authorization: APIKey {SUA_CHAVE}` (cada usu√°rio deve usar sua pr√≥pria chave).
+- Consulta: `POST` com corpo de query Elasticsearch.
+- Retorno: Metadados p√∫blicos (classe, assunto, √≥rg√£o, movimenta√ß√µes).
+- Sigilo: 403/404 sem vazamento.
 
 ## LGPD e Sigilo
-- Armazenamento somente de metadados p˙blicos.
-- N„o armazenar dados sensÌveis (CPF/CNPJ completos, nomes de partes vulner·veis).
-- Logs apenas com metadados anonimizados.
-- Sigilo: se CNJ retornar 403/404, marcar `IsSigiloso = true` e responder "Processo com acesso restrito".
+- Armazenamento apenas de metadados p√∫blicos.
+- N√£o armazenar dados sens√≠veis (CPF/CNPJ completos, nomes de partes vulner√°veis). Descri√ß√µes s√£o anonimizadas (m√°scara de CPFs/CNPJs).
+- Logs anonimizados.
+- Sigilo: se CNJ retornar 403/404, n√£o persistir detalhes; apenas informar acesso restrito.
 
-## ConfiguraÁ„o
+## Configura√ß√£o
 Edite `CnjProcessosApi/appsettings.json` e `appsettings.Development.json`:
 - `ConnectionStrings:DefaultConnection`: caminho do SQLite.
 - `DataJud:BaseUrl`: `https://api-publica.datajud.cnj.jus.br/`
-- `DataJud:ApiKey`: sua chave p˙blica CNJ.
+- `DataJud:ApiKey`: sua chave p√∫blica CNJ.
 - `DataJud:TribunalEndpoint`: ex. `api_publica_tjsp/_search`.
-- `Jwt:Issuer/Audience/Secret`: configurar segredo forte (>=32 chars).
-- `Quartz:SyncIntervalCron`: cron do job (default: a cada 4h).
-- `Processos:NumerosCNJ`: lista dos n˙meros CNJ do escritÛrio.
+- `RateLimiting:PermitLimitPerMinute`: default 120.
+- `Quartz:SyncIntervalCron`: cron di√°rio (default `0 0 0 * * ?`).
+- `Legal:NonCommercialOnly` e `Legal:TermsOfUseUrl`.
+- `Legal:Disclaimer`: mensagem padr√£o nas respostas.
 
 ### Obtendo a APIKey CNJ
-- Cadastre-se no portal do CNJ/DataJud para obter a chave p˙blica.
-- Configure a chave no `appsettings`.
+- Cadastre-se no portal do CNJ/DataJud e obtenha sua chave p√∫blica.
+- Configure a chave em `appsettings` ou via vari√°vel de ambiente.
 
 ## Desenvolvimento
-### PrÈ-requisitos
+### Pr√©-requisitos
 - .NET 8 SDK
-- CLI do EF Core: `dotnet tool install --global dotnet-ef` (opcional)
+- CLI do EF Core: `dotzero tool install --global dotnet-ef` (opcional)
 
 ### Restaurar e executar
 - `dotnet restore`
 - `dotnet run --project CnjProcessosApi`
 - Swagger: `https://localhost:{porta}/swagger`
+- Frontend: `https://localhost:{porta}/`
 
-### AutenticaÁ„o de teste
-- POST `api/auth/login` com corpo:
-```
-{ "username": "admin", "password": "admin" }
-```
-- Use o token Bearer nos endpoints protegidos.
-
-## Banco de dados e migraÁıes
-- Adicionar migraÁ„o inicial:
+## Banco de dados e migra√ß√µes
+- Migra√ß√£o inicial:
 ```
 dotnet ef migrations add InitialCreate -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 ```
@@ -74,14 +79,14 @@ dotnet ef migrations add InitialCreate -p CnjProcessosApi.Infrastructure -s CnjP
 dotnet ef database update -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 ```
 
-## Job de sincronizaÁ„o (Quartz)
-- Por padr„o executa a cada 4 horas.
+## Job de sincroniza√ß√£o (Quartz)
+- Execu√ß√£o di√°ria (cron default `0 0 0 * * ?`).
 - Ajuste o cron em `Quartz:SyncIntervalCron`.
-- SincronizaÁ„o manual: `POST /api/processos/sync` (JWT obrigatÛrio).
+- Sincroniza√ß√£o manual: `POST /api/processos/sync` (rate limited).
 
 ## Logging
-- Serilog configurado para Console e arquivo em `Logs/`.
-- Ajuste nÌveis em `Serilog.MinimumLevel` e sinks no `appsettings`.
+- Serilog para Console e arquivo em `Logs/`.
+- Ajuste n√≠veis em `Serilog.MinimumLevel`.
 
 ## Exemplo de query Elasticsearch (DataJud)
 - Endpoint: `POST https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search`
@@ -98,6 +103,49 @@ dotnet ef database update -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 }
 ```
 
-## ObservaÁıes finais
-- Adeque o mapeamento do JSON retornado pelo DataJud no client para preencher `Classe`, `Assunto`, `OrgaoJulgador` e `Movimentacoes` conforme a documentaÁ„o oficial.
-- Respeite a Portaria CNJ 160/2020 e a LGPD no tratamento dos dados.
+## Conformidade e Termos
+- Leia `TERMOs_DE_USO.md` para resumo das cl√°usulas chave (1.2, 3.2, 3.3, 3.6, 3.8, 3.9, 3.13, 3.19).
+- Uso gratuito e n√£o comercial. Informa√ß√µes "as is".
+- Informe o CNJ ao publicar estudos ou relat√≥rios: ver canais oficiais no portal DataJud (email ou formul√°rio disponibilizado pelo CNJ).
+
+## Licen√ßa
+- MIT License. Este projeto √© open-source e gratuito, sem explora√ß√£o comercial dos dados do DataJud.
+
+## Deploy com Docker (gratuito)
+
+### Dockerfile (Linux)
+Crie um arquivo `Dockerfile` na raiz:
+```
+# build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore
+RUN dotnet publish CnjProcessosApi/CnjProcessosApi.csproj -c Release -o /app
+
+# runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+COPY --from=build /app .
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "CnjProcessosApi.dll"]
+```
+
+### Executar localmente
+```
+docker build -t cnjprocessosapi:latest .
+docker run -p 8080:8080 -e DataJud__ApiKey=SUA_CHAVE cnjprocessosapi:latest
+```
+Acesse: `http://localhost:8080/` e `http://localhost:8080/swagger`
+
+### Deploy gratuito (Azure App Service Free)
+- Crie um Azure App Service (Free) com Container Linux.
+- Envie a imagem para um registry (ex.: Docker Hub) ou use build do Azure.
+- Configure no App Service:
+  - `WEBSITES_PORT=8080`
+  - `ASPNETCORE_URLS=http://+:8080`
+  - `DataJud__ApiKey=SUA_CHAVE`
+- Ative HTTP/2 e monitore logs.
+
+Observa√ß√µes de conformidade: mantenha o rate limiting ativo e evite uso comercial; cada usu√°rio deve usar sua pr√≥pria APIKey do CNJ.
