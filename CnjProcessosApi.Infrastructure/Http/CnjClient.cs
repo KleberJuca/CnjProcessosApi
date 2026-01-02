@@ -20,7 +20,13 @@ public class CnjClient : ICnjClient
 
     public async Task<(Processo? processo, bool sigiloso)> BuscarProcessoAsync(string numeroCnj, string tribunalEndpoint, CancellationToken ct = default)
     {
-        var url = tribunalEndpoint;
+        // Usa caminho relativo combinado com BaseAddress do HttpClient
+        var url = tribunalEndpoint?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            _logger.LogWarning("TribunalEndpoint não configurado");
+            return (null, false);
+        }
 
         var query = new
         {
@@ -28,13 +34,21 @@ public class CnjClient : ICnjClient
             {
                 term = new Dictionary<string, object> { { "numeroProcesso.keyword", numeroCnj } }
             },
-            size = 10000
+            size = 500 // reduzir payload
         };
         var content = new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json");
 
         try
         {
             var response = await _httpClient.PostAsync(url, content, ct);
+
+            // 401: falta/erro de APIKey
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                var body401 = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogError("Unauthorized ao consultar CNJ. Verifique DataJud:ApiKey e cabeçalho Authorization. Body: {body}", body401);
+                return (null, false);
+            }
 
             // Tratamento explícito de sigilo
             if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.NotFound)
@@ -43,7 +57,7 @@ public class CnjClient : ICnjClient
                 return (null, true);
             }
 
-            // Demais códigos não-sucesso: não lançar exceção, apenas logar e retornar nulo
+            // Demais códigos não-sucesso
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(ct);
@@ -52,7 +66,7 @@ public class CnjClient : ICnjClient
             }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            // Map simplificado (ajuste conforme schema DataJud)
+            // TODO: Mapear schema real do DataJud. Mantém estrutura mínima.
             var proc = new Processo
             {
                 NumeroCNJ = numeroCnj,
@@ -62,7 +76,6 @@ public class CnjClient : ICnjClient
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            // Timeout
             _logger.LogError(ex, "Timeout ao consultar CNJ para {numero}", numeroCnj);
             return (null, false);
         }

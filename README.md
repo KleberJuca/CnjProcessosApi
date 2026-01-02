@@ -1,73 +1,108 @@
 # CnjProcessosApi
 
-API RESTful pÃºblica e gratuita em .NET 8 para consulta de metadados de processos judiciais pÃºblicos via API PÃºblica do DataJud (CNJ). Arquitetura Clean com projetos Core, Infrastructure e Web.
+API RESTful pública e gratuita em .NET 8 para consulta de metadados de processos judiciais públicos via API Pública do DataJud (CNJ). Arquitetura Clean com projetos Core, Infrastructure e Web. Front-end em Razor Pages com Bootstrap.
 
 > Aviso Legal Importante
 >
-> - O consumo da API PÃºblica do DataJud implica aceitaÃ§Ã£o tÃ¡cita e integral do Termo de Uso do CNJ (clÃ¡usula 1.2).
-> - Uso estritamente legal, nÃ£o comercial e autorizado. Uso comercial Ã© proibido (clÃ¡usulas 3.3 e 3.8).
-> - O CNJ nÃ£o garante precisÃ£o, integridade ou atualidade dos dados (clÃ¡usula 3.6). Dados fornecidos "as is".
-> - O usuÃ¡rio Ã© responsÃ¡vel por qualquer informaÃ§Ã£o derivada (clÃ¡usula 3.2) e deve dar ciÃªncia ao CNJ sobre publicaÃ§Ãµes ao pÃºblico (clÃ¡usula 3.9).
-> - Limite de 120 requisiÃ§Ãµes/minuto por IP (clÃ¡usula 3.13). Esta API aplica rate limiting.
-> - Sigilo: processos restritos retornam erro sem vazamento (clÃ¡usula 3.19).
+> - O consumo da API Pública do DataJud implica aceitação tácita e integral do Termo de Uso do CNJ (cláusula 1.2).
+> - Uso estritamente legal, não comercial e autorizado. Uso comercial é proibido (cláusulas 3.3 e 3.8).
+> - O CNJ não garante precisão, integridade ou atualidade dos dados (cláusula 3.6). Dados fornecidos "as is".
+> - O usuário é responsável por qualquer informação derivada (cláusula 3.2) e deve dar ciência ao CNJ sobre publicações ao público (cláusula 3.9).
+> - Limite de 120 requisições/minuto por IP (cláusula 3.13). Esta API aplica rate limiting.
+> - Sigilo: processos restritos retornam erro sem vazamento (cláusula 3.19).
 > - Termo de Uso: https://datajud-wiki.cnj.jus.br/api-publica/termo-de-uso
 
 ## Tecnologias
-- ASP.NET Core 8 (Controllers, Razor Pages, Swagger, Health Checks)
-- Entity Framework Core + SQLite (cache local somente de metadados pÃºblicos)
+- ASP.NET Core 8 (Controllers, Razor Pages + Bootstrap, Swagger, Health Checks)
+- Entity Framework Core + SQLite (cache local somente de metadados públicos)
 - HttpClient + Polly (retry leve)
-- Quartz.NET (job diÃ¡rio)
+- Quartz.NET (job diário)
 - Serilog (console + arquivo)
 - Rate Limiting (AspNetCore.RateLimiting)
 
-## Endpoints principais (pÃºblicos)
-- GET `api/processos` â€“ Lista paginada de processos com Ãºltima movimentaÃ§Ã£o e `Disclaimer`.
-- GET `api/processos/{numeroCNJ}` â€“ Detalhe do processo + Ãºltima movimentaÃ§Ã£o com `Disclaimer`.
-- POST `api/processos/sync` â€“ Solicita sincronizaÃ§Ã£o manual com CNJ (pode ser usado com critÃ©rio; sujeito a rate limit).
-- GET `health` â€“ Health checks.
-- Frontend: `Pages/Index.cshtml` â€“ Consulta simples para cidadÃ£os.
+## Endpoints principais (públicos)
+- GET `api/processos` – Lista paginada de processos com última movimentação e `Disclaimer`.
+- GET `api/processos/{numeroCNJ}` – Detalhe do processo + última movimentação com `Disclaimer`.
+- POST `api/processos/sync` – Solicita sincronização manual com CNJ (pode ser usado com critério; sujeito a rate limit).
+- GET `health` – Health checks.
+- Frontend: `Pages/Index.cshtml` – Consulta simples e responsiva (Bootstrap).
 
-Todos os endpoints sÃ£o pÃºblicos e sujeitos a rate limiting (120 req/min/IP).
+Todos os endpoints são públicos e sujeitos a rate limiting (120 req/min/IP).
+
+## Rede e Portas
+- HTTP: escuta em `http://localhost:5000` e `http://0.0.0.0:5000` (acesso externo na rede via `http://SEU_IP:5000`).
+- HTTPS: escuta em `https://localhost:5001` e `https://0.0.0.0:5001` (configure certificado no host/reverse proxy para acesso externo).
+
+## Como obter a APIKey do DataJud (CNJ)
+A API do DataJud exige uma chave por usuário. Não existe chave pública única.
+
+Passos:
+1) Acesse o portal do CNJ/DataJud (página da API Pública) e crie uma conta.
+2) Leia e aceite o Termo de Uso da API Pública (v1.1).
+3) Solicite acesso à API Pública e aguarde aprovação; uma `APIKey` será emitida para o seu usuário.
+4) Configure a `APIKey` na aplicação:
+   - Variável de ambiente: `DataJud__ApiKey=SUACHAVE`
+   - Ou `appsettings.json`:
+     ```
+     "DataJud": {
+       "BaseUrl": "https://api-publica.datajud.cnj.jus.br/",
+       "ApiKey": "SUACHAVE",
+       "TribunalEndpoint": "api_publica_tjce/_search" // ajuste ao seu tribunal
+     }
+     ```
+5) Defina o `TribunalEndpoint` conforme o tribunal do número CNJ:
+   - Ex.: TJCE (8.06) ? `api_publica_tjce/_search`
+   - TJSP (8.26) ? `api_publica_tjsp/_search`
+   - Consulte a documentação do DataJud para outros tribunais.
+
+Testar sua chave diretamente (curl):
+```
+curl -X POST "https://api-publica.datajud.cnj.jus.br/api_publica_tjce/_search" \
+  -H "Authorization: APIKey SUACHAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"query":{"term":{"numeroProcesso.keyword":"0010237-46.2020.8.06.0068"}},"size":500}'
+```
+Se retornar `401 Unauthorized`, gere ou corrija a chave no portal do DataJud.
 
 ## Requisitos da API DataJud (CNJ)
 - Base URL: https://api-publica.datajud.cnj.jus.br/
 - Endpoint por tribunal: `_search` (ex.: `api_publica_tjsp/_search`).
-- AutenticaÃ§Ã£o: Header `Authorization: APIKey {SUA_CHAVE}` (cada usuÃ¡rio deve usar sua prÃ³pria chave).
+- Autenticação: Header `Authorization: APIKey {SUA_CHAVE}` (cada usuário deve usar sua própria chave).
 - Consulta: `POST` com corpo de query Elasticsearch.
-- Retorno: Metadados pÃºblicos (classe, assunto, Ã³rgÃ£o, movimentaÃ§Ãµes).
+- Retorno: Metadados públicos (classe, assunto, órgão, movimentações).
 - Sigilo: 403/404 sem vazamento.
 
 ## LGPD e Sigilo
-- Armazenamento apenas de metadados pÃºblicos.
-- NÃ£o armazenar dados sensÃ­veis (CPF/CNPJ completos, nomes de partes vulnerÃ¡veis). DescriÃ§Ãµes sÃ£o anonimizadas (mÃ¡scara de CPFs/CNPJs).
+- Armazenamento apenas de metadados públicos.
+- Não armazenar dados sensíveis (CPF/CNPJ completos, nomes de partes vulneráveis). Descrições são anonimizadas (máscara de CPFs/CNPJs).
 - Logs anonimizados.
-- Sigilo: se CNJ retornar 403/404, nÃ£o persistir detalhes; apenas informar acesso restrito.
+- Sigilo: se CNJ retornar 403/404, não persistir detalhes; apenas informar acesso restrito.
 
-## ConfiguraÃ§Ã£o
+## Configuração
 Edite `CnjProcessosApi/appsettings.json` e `appsettings.Development.json`:
 - `ConnectionStrings:DefaultConnection`: caminho do SQLite.
 - `DataJud:BaseUrl`: `https://api-publica.datajud.cnj.jus.br/`
-- `DataJud:ApiKey`: sua chave pÃºblica CNJ.
+- `DataJud:ApiKey`: sua chave pública CNJ.
 - `DataJud:TribunalEndpoint`: ex. `api_publica_tjsp/_search`.
 - `RateLimiting:PermitLimitPerMinute`: default 120.
-- `Quartz:SyncIntervalCron`: cron diÃ¡rio (default `0 0 0 * * ?`).
+- `Quartz:SyncIntervalCron`: cron diário (default `0 0 0 * * ?`).
 - `Legal:NonCommercialOnly` e `Legal:TermsOfUseUrl`.
-- `Legal:Disclaimer`: mensagem padrÃ£o nas respostas.
+- `Legal:Disclaimer`: mensagem padrão nas respostas.
 
 ### Obtendo a APIKey CNJ
-- Cadastre-se no portal do CNJ/DataJud e obtenha sua chave pÃºblica.
-- Configure a chave em `appsettings` ou via variÃ¡vel de ambiente.
+- Cadastre-se no portal do CNJ/DataJud e obtenha sua chave pública.
+- Configure a chave em `appsettings` ou via variável de ambiente.
 
 ## Desenvolvimento
-### PrÃ©-requisitos
+### Pré-requisitos
 - .NET 8 SDK
 - CLI do EF Core: `dotnet tool install --global dotnet-ef` (opcional)
 
 ### Restaurar e executar
 - `dotnet restore`
 - `dotnet run --project CnjProcessosApi`
-- Swagger: `https://localhost:{porta}/swagger`
-- Frontend: `https://localhost:{porta}/`
+- Swagger: `http://localhost:5000/swagger`
+- Frontend: `http://localhost:5000/`
 
 ## Exemplos para testar
 
@@ -92,7 +127,7 @@ curl "http://localhost:5000/api/processos?filtro=0000000-00.0000.0.00.0000&page=
 curl "http://localhost:5000/api/processos/0000000-00.0000.0.00.0000"
 ```
 
-### SincronizaÃ§Ã£o manual (respeita rate limiting)
+### Sincronização manual (respeita rate limiting)
 ```
 curl -X POST "http://localhost:5000/api/processos/sync"
 ```
@@ -103,17 +138,17 @@ curl "http://localhost:5000/health"
 ```
 
 ### Testar rate limiting (exemplo simplificado)
-Dispare mais de 120 requisiÃ§Ãµes em 1 minuto do mesmo IP e observe resposta 429.
+Dispare mais de 120 requisições em 1 minuto do mesmo IP e observe resposta 429.
 ```
 for i in {1..130}; do curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:5000/health"; done
 ```
 
 ### Usar via navegador (Razor Pages e Swagger)
-- Acesse `http://localhost:5000/` e use o formulÃ¡rio da pÃ¡gina para consultar.
-- Acesse `http://localhost:5000/swagger` e teste os endpoints pelo Swagger UI.
+- `http://localhost:5000/` (formulário Bootstrap)
+- `http://localhost:5000/swagger`
 
-## Banco de dados e migraÃ§Ãµes
-- MigraÃ§Ã£o inicial:
+## Banco de dados e migrações
+- Migração inicial:
 ```
 dotnet ef migrations add InitialCreate -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 ```
@@ -122,14 +157,14 @@ dotnet ef migrations add InitialCreate -p CnjProcessosApi.Infrastructure -s CnjP
 dotnet ef database update -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 ```
 
-## Job de sincronizaÃ§Ã£o (Quartz)
-- ExecuÃ§Ã£o diÃ¡ria (cron default `0 0 0 * * ?`).
+## Job de sincronização (Quartz)
+- Execução diária (cron default `0 0 0 * * ?`).
 - Ajuste o cron em `Quartz:SyncIntervalCron`.
-- SincronizaÃ§Ã£o manual: `POST /api/processos/sync` (rate limited).
+- Sincronização manual: `POST /api/processos/sync` (rate limited).
 
 ## Logging
 - Serilog para Console e arquivo em `Logs/`.
-- Ajuste nÃ­veis em `Serilog.MinimumLevel`.
+- Ajuste níveis em `Serilog.MinimumLevel`.
 
 ## Exemplo de query Elasticsearch (DataJud)
 - Endpoint: `POST https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search`
@@ -147,12 +182,12 @@ dotnet ef database update -p CnjProcessosApi.Infrastructure -s CnjProcessosApi
 ```
 
 ## Conformidade e Termos
-- Leia `TERMOs_DE_USO.md` para resumo das clÃ¡usulas chave (1.2, 3.2, 3.3, 3.6, 3.8, 3.9, 3.13, 3.19).
-- Uso gratuito e nÃ£o comercial. InformaÃ§Ãµes "as is".
-- Informe o CNJ ao publicar estudos ou relatÃ³rios: ver canais oficiais no portal DataJud (email ou formulÃ¡rio disponibilizado pelo CNJ).
+- Leia `TERMOs_DE_USO.md` para resumo das cláusulas chave (1.2, 3.2, 3.3, 3.6, 3.8, 3.9, 3.13, 3.19).
+- Uso gratuito e não comercial. Informações "as is".
+- Informe o CNJ ao publicar estudos ou relatórios: ver canais oficiais no portal DataJud (email ou formulário disponibilizado pelo CNJ).
 
-## LicenÃ§a
-- MIT License. Este projeto Ã© open-source e gratuito, sem exploraÃ§Ã£o comercial dos dados do DataJud.
+## Licença
+- MIT License. Este projeto é open-source e gratuito, sem exploração comercial dos dados do DataJud.
 
 ## Deploy com Docker (gratuito)
 
@@ -191,4 +226,4 @@ Acesse: `http://localhost:8080/` e `http://localhost:8080/swagger`
   - `DataJud__ApiKey=SUA_CHAVE`
 - Ative HTTP/2 e monitore logs.
 
-ObservaÃ§Ãµes de conformidade: mantenha o rate limiting ativo e evite uso comercial; cada usuÃ¡rio deve usar sua prÃ³pria APIKey do CNJ.
+Observações de conformidade: mantenha o rate limiting ativo e evite uso comercial; cada usuário deve usar sua própria APIKey do CNJ.

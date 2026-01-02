@@ -33,6 +33,37 @@ Todos os endpoints são públicos e sujeitos a rate limiting (120 req/min/IP).
 - HTTP: escuta em `http://localhost:5000` e `http://0.0.0.0:5000` (acesso externo na rede via `http://SEU_IP:5000`).
 - HTTPS: escuta em `https://localhost:5001` e `https://0.0.0.0:5001` (configure certificado no host/reverse proxy para acesso externo).
 
+## Como obter a APIKey do DataJud (CNJ)
+A API do DataJud exige uma chave por usuário. Não existe chave pública única.
+
+Passos:
+1) Acesse o portal do CNJ/DataJud (página da API Pública) e crie uma conta.
+2) Leia e aceite o Termo de Uso da API Pública (v1.1).
+3) Solicite acesso à API Pública e aguarde aprovação; uma `APIKey` será emitida para o seu usuário.
+4) Configure a `APIKey` na aplicação:
+   - Variável de ambiente: `DataJud__ApiKey=SUACHAVE`
+   - Ou `appsettings.json`:
+     ```
+     "DataJud": {
+       "BaseUrl": "https://api-publica.datajud.cnj.jus.br/",
+       "ApiKey": "SUACHAVE",
+       "TribunalEndpoint": "api_publica_tjce/_search" // ajuste ao seu tribunal
+     }
+     ```
+5) Defina o `TribunalEndpoint` conforme o tribunal do número CNJ:
+   - Ex.: TJCE (8.06) ? `api_publica_tjce/_search`
+   - TJSP (8.26) ? `api_publica_tjsp/_search`
+   - Consulte a documentação do DataJud para outros tribunais.
+
+Testar sua chave diretamente (curl):
+```
+curl -X POST "https://api-publica.datajud.cnj.jus.br/api_publica_tjce/_search" \
+  -H "Authorization: APIKey SUACHAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"query":{"term":{"numeroProcesso.keyword":"0010237-46.2020.8.06.0068"}},"size":500}'
+```
+Se retornar `401 Unauthorized`, gere ou corrija a chave no portal do DataJud.
+
 ## Requisitos da API DataJud (CNJ)
 - Base URL: https://api-publica.datajud.cnj.jus.br/
 - Endpoint por tribunal: `_search` (ex.: `api_publica_tjsp/_search`).
