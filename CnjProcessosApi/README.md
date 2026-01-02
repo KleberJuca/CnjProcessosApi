@@ -61,13 +61,56 @@ Edite `CnjProcessosApi/appsettings.json` e `appsettings.Development.json`:
 ## Desenvolvimento
 ### Pré-requisitos
 - .NET 8 SDK
-- CLI do EF Core: `dotzero tool install --global dotnet-ef` (opcional)
+- CLI do EF Core: `dotnet tool install --global dotnet-ef` (opcional)
 
 ### Restaurar e executar
 - `dotnet restore`
 - `dotnet run --project CnjProcessosApi`
 - Swagger: `https://localhost:{porta}/swagger`
 - Frontend: `https://localhost:{porta}/`
+
+## Exemplos para testar
+
+### Configurar a APIKey e executar
+- Windows PowerShell:
+```
+$env:DataJud__ApiKey="SUA_CHAVE_AQUI"
+dotnet run --project CnjProcessosApi
+```
+- Linux/macOS:
+```
+DataJud__ApiKey="SUA_CHAVE_AQUI" dotnet run --project CnjProcessosApi
+```
+
+### Listar processos com filtro
+```
+curl "http://localhost:5000/api/processos?filtro=0000000-00.0000.0.00.0000&page=1&pageSize=10"
+```
+
+### Detalhe de um processo
+```
+curl "http://localhost:5000/api/processos/0000000-00.0000.0.00.0000"
+```
+
+### Sincronização manual (respeita rate limiting)
+```
+curl -X POST "http://localhost:5000/api/processos/sync"
+```
+
+### Health check
+```
+curl "http://localhost:5000/health"
+```
+
+### Testar rate limiting (exemplo simplificado)
+Dispare mais de 120 requisições em 1 minuto do mesmo IP e observe resposta 429.
+```
+for i in {1..130}; do curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:5000/health"; done
+```
+
+### Usar via navegador (Razor Pages e Swagger)
+- Acesse `http://localhost:5000/` e use o formulário da página para consultar.
+- Acesse `http://localhost:5000/swagger` e teste os endpoints pelo Swagger UI.
 
 ## Banco de dados e migrações
 - Migração inicial:
