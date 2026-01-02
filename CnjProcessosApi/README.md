@@ -1,6 +1,6 @@
 # CnjProcessosApi
 
-API RESTful pública e gratuita em .NET 8 para consulta de metadados de processos judiciais públicos via API Pública do DataJud (CNJ). Arquitetura Clean com projetos Core, Infrastructure e Web.
+API RESTful pública e gratuita em .NET 8 para consulta de metadados de processos judiciais públicos via API Pública do DataJud (CNJ). Arquitetura Clean com projetos Core, Infrastructure e Web. Front-end em Razor Pages com Bootstrap.
 
 > Aviso Legal Importante
 >
@@ -13,7 +13,7 @@ API RESTful pública e gratuita em .NET 8 para consulta de metadados de processos
 > - Termo de Uso: https://datajud-wiki.cnj.jus.br/api-publica/termo-de-uso
 
 ## Tecnologias
-- ASP.NET Core 8 (Controllers, Razor Pages, Swagger, Health Checks)
+- ASP.NET Core 8 (Controllers, Razor Pages + Bootstrap, Swagger, Health Checks)
 - Entity Framework Core + SQLite (cache local somente de metadados públicos)
 - HttpClient + Polly (retry leve)
 - Quartz.NET (job diário)
@@ -25,9 +25,13 @@ API RESTful pública e gratuita em .NET 8 para consulta de metadados de processos
 - GET `api/processos/{numeroCNJ}` – Detalhe do processo + última movimentação com `Disclaimer`.
 - POST `api/processos/sync` – Solicita sincronização manual com CNJ (pode ser usado com critério; sujeito a rate limit).
 - GET `health` – Health checks.
-- Frontend: `Pages/Index.cshtml` – Consulta simples para cidadãos.
+- Frontend: `Pages/Index.cshtml` – Consulta simples e responsiva (Bootstrap).
 
 Todos os endpoints são públicos e sujeitos a rate limiting (120 req/min/IP).
+
+## Rede e Portas
+- HTTP: escuta em `http://localhost:5000` e `http://0.0.0.0:5000` (acesso externo na rede via `http://SEU_IP:5000`).
+- HTTPS: escuta em `https://localhost:5001` e `https://0.0.0.0:5001` (configure certificado no host/reverse proxy para acesso externo).
 
 ## Requisitos da API DataJud (CNJ)
 - Base URL: https://api-publica.datajud.cnj.jus.br/
@@ -66,8 +70,8 @@ Edite `CnjProcessosApi/appsettings.json` e `appsettings.Development.json`:
 ### Restaurar e executar
 - `dotnet restore`
 - `dotnet run --project CnjProcessosApi`
-- Swagger: `https://localhost:{porta}/swagger`
-- Frontend: `https://localhost:{porta}/`
+- Swagger: `http://localhost:5000/swagger`
+- Frontend: `http://localhost:5000/`
 
 ## Exemplos para testar
 
@@ -109,8 +113,8 @@ for i in {1..130}; do curl -s -o /dev/null -w "%{http_code}\n" "http://localhost
 ```
 
 ### Usar via navegador (Razor Pages e Swagger)
-- Acesse `http://localhost:5000/` e use o formulário da página para consultar.
-- Acesse `http://localhost:5000/swagger` e teste os endpoints pelo Swagger UI.
+- `http://localhost:5000/` (formulário Bootstrap)
+- `http://localhost:5000/swagger`
 
 ## Banco de dados e migrações
 - Migração inicial:

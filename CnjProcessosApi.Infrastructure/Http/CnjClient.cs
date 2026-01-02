@@ -35,12 +35,22 @@ public class CnjClient : ICnjClient
         try
         {
             var response = await _httpClient.PostAsync(url, content, ct);
+
+            // Tratamento explícito de sigilo
             if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.NotFound)
             {
                 _logger.LogWarning("Processo {numero} com acesso restrito ou não encontrado.", numeroCnj);
                 return (null, true);
             }
-            response.EnsureSuccessStatusCode();
+
+            // Demais códigos não-sucesso: não lançar exceção, apenas logar e retornar nulo
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning("Falha ao consultar CNJ para {numero}. Status: {status}. Body: {body}", numeroCnj, (int)response.StatusCode, body);
+                return (null, false);
+            }
+
             var json = await response.Content.ReadAsStringAsync(ct);
             // Map simplificado (ajuste conforme schema DataJud)
             var proc = new Processo
@@ -50,10 +60,21 @@ public class CnjClient : ICnjClient
             };
             return (proc, false);
         }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            // Timeout
+            _logger.LogError(ex, "Timeout ao consultar CNJ para {numero}", numeroCnj);
+            return (null, false);
+        }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "Erro HTTP ao consultar CNJ para {numero}", numeroCnj);
-            throw;
+            return (null, false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro inesperado ao consultar CNJ para {numero}", numeroCnj);
+            return (null, false);
         }
     }
 }

@@ -16,6 +16,9 @@ using Polly; // add polly root namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Listen on localhost and all interfaces for HTTP (5000) and HTTPS (5001)
+builder.WebHost.UseUrls("http://localhost:5000;http://0.0.0.0:5000;https://localhost:5001;https://0.0.0.0:5001");
+
 // Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -103,15 +106,12 @@ if (app.Environment.IsDevelopment())
     {
         var terms = builder.Configuration["Legal:TermsOfUseUrl"] ?? "";
         options.DocumentTitle = "CnjProcessos API Pública (Uso não comercial)";
-        if (!string.IsNullOrWhiteSpace(terms))
-        {
-            // Swagger banner via description could be added in OpenApiInfo
-        }
     });
 }
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseLegalCompliance();
 app.UseRateLimiter();
 
