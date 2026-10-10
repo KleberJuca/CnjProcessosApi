@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cnjprocessos-kleberjuca
+    runtime: docker
+    plan: free
+    repo: https://github.com/KleberJuca/CnjProcessosApi
+    branch: master
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: ConnectionStrings__DefaultConnection
+        value: Data Source=/tmp/processos.db
+      - key: DataJud__ApiKey
+        sync: false
+      - key: Swagger__Enabled
+        value: "true"
+      - key: Processos__EnableManualSync
+        value: "false"
