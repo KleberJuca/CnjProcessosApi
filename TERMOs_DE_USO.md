@@ -1,35 +1,19 @@
-# Termos de Uso (Resumo) ñ API P˙blica do DataJud (CNJ)
+# Uso dos dados do DataJud
 
-Este projeto segue integralmente o Termo de Uso da API P˙blica do DataJud do CNJ (vers„o 1.1). Abaixo, um resumo das cl·usulas chave. Leia o documento oficial para detalhes completos:
+Leia o [Termo de Uso vigente na documenta√ß√£o oficial do CNJ](https://datajud-wiki.cnj.jus.br/api-publica/termo-uso/). Este arquivo √© uma orienta√ß√£o do projeto e n√£o substitui o documento oficial.
 
-Link oficial: https://datajud-wiki.cnj.jus.br/api-publica/termo-de-uso
+A documenta√ß√£o do CNJ estabelece uso legal, autorizado e n√£o comercial, atribui responsabilidade ao consumidor e informa que n√£o h√° garantia de precis√£o ou atualiza√ß√£o dos dados. Tamb√©m prev√™ comunicar ao CNJ informa√ß√µes derivadas que sejam disponibilizadas ao p√∫blico.
 
-1.2 ñ AceitaÁ„o t·cita
-- O uso da API implica aceitaÁ„o integral do Termo de Uso.
+O c√≥digo deste projeto √© distribu√≠do sob licen√ßa MIT. A licen√ßa do c√≥digo n√£o altera as condi√ß√µes aplic√°veis √† API e aos dados do CNJ.
 
-3.2 ñ Responsabilidade do usu·rio
-- O usu·rio se responsabiliza pelo uso da interface e por qualquer informaÁ„o derivada.
+## Comportamento da aplica√ß√£o
 
-3.3 ñ Uso n„o comercial
-- Uso exclusivamente legal, n„o comercial e autorizado. Uso indevido, abusivo, ilegal, malicioso ou imoral È proibido.
+- Coleta apenas os campos utilizados na consulta: n√∫mero, classe, assuntos, √≥rg√£o e nomes/datas de movimentos.
+- N√£o extrai nomes das partes nem documentos processuais.
+- Suprime resultados com n√≠vel de sigilo diferente de zero ou sem n√≠vel explicitado.
+- Remove o cache de um processo quando uma nova consulta indica restri√ß√£o ou aus√™ncia.
+- Mascara padr√µes num√©ricos de CPF/CNPJ nas descri√ß√µes, sem alegar anonimiza√ß√£o completa.
+- Limita requisi√ß√µes recebidas e tentativas enviadas ao DataJud por inst√¢ncia.
+- Informa que os dados podem estar desatualizados e devem ser conferidos na origem.
 
-3.6 ñ Dados ìas isî
-- O CNJ n„o garante precis„o, integridade ou atualidade dos dados fornecidos.
-
-3.8 ñ ProibiÁ„o de exploraÁ„o comercial
-- O usu·rio n„o deve modificar, distribuir, vender ou explorar comercialmente a API ou qualquer informaÁ„o derivada.
-
-3.9 ñ ComunicaÁ„o ao CNJ
-- O usu·rio concorda em dar ciÍncia ao CNJ de qualquer publicaÁ„o, estudo, relatÛrio ou documento disponibilizado ao p˙blico em geral que utilize dados da API.
-
-3.13 ñ Limites de requisiÁıes
-- Limite de 120 requisiÁıes por minuto por IP. Esta aplicaÁ„o aplica rate limiting para facilitar conformidade.
-
-3.19 ñ Tratamento de sigilo
-- Processos com acesso restrito devem retornar erro sem vazamento de informaÁıes.
-
-LGPD ñ ProteÁ„o de dados pessoais
-- N„o armazenamos dados pessoais sensÌveis. Metadados p˙blicos podem ser cacheados e descriÁıes s„o anonimizadas (m·scara de CPFs/CNPJs).
-
-Aviso
-- Este projeto È open-source (licenÁa MIT) e gratuito, sem exploraÁ„o comercial dos dados do DataJud. Ao usar, vocÍ concorda com estes termos e com o Termo de Uso oficial do CNJ.
+O cache pode refletir a situa√ß√£o de acesso observada anteriormente at√© a pr√≥xima consulta. Defina a dura√ß√£o conforme o seu contexto. A conformidade da implanta√ß√£o depende tamb√©m de configura√ß√£o, reten√ß√£o, logs e opera√ß√£o; n√£o √© garantida apenas pelo c√≥digo.

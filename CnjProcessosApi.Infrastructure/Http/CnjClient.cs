@@ -1,93 +1,99 @@
+using System.Globalization;
 using System.Net;
-using System.Text;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CnjProcessosApi.Core.Models;
-using Microsoft.Extensions.Logging;
 using CnjProcessosApi.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace CnjProcessosApi.Infrastructure.Http;
 
-public class CnjClient : ICnjClient
+public class CnjClient(HttpClient httpClient, ILogger<CnjClient> logger) : ICnjClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<CnjClient> _logger;
-
-    public CnjClient(HttpClient httpClient, ILogger<CnjClient> logger)
+    public async Task<(Processo? processo, bool sigiloso)> BuscarProcessoAsync(string numeroCnj, string tribunalEndpoint, CancellationToken ct = default, string? apiKey = null)
     {
-        _httpClient = httpClient;
-        _logger = logger;
-    }
-
-    public async Task<(Processo? processo, bool sigiloso)> BuscarProcessoAsync(string numeroCnj, string tribunalEndpoint, CancellationToken ct = default)
-    {
-        // Usa caminho relativo combinado com BaseAddress do HttpClient
-        var url = tribunalEndpoint?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(url))
+        numeroCnj = NumeroCnj.Normalizar(numeroCnj);
+        if (!Regex.IsMatch(tribunalEndpoint, @"^api_publica_[a-z0-9-]+/_search$"))
+            throw new ArgumentException("Endpoint de tribunal inv√°lido.");
+        if (apiKey is not null)
         {
-            _logger.LogWarning("TribunalEndpoint n„o configurado");
-            return (null, false);
+            apiKey = apiKey.Trim();
+            if (apiKey.StartsWith("APIKey ", StringComparison.OrdinalIgnoreCase)) apiKey = apiKey[7..].Trim();
+            if (!Regex.IsMatch(apiKey, @"^[A-Za-z0-9+/=_-]{8,2048}$"))
+                throw new ArgumentException("A chave DataJud informada tem formato inv√°lido.");
+            if (httpClient.BaseAddress?.Scheme != "https" || httpClient.BaseAddress.Host != "api-publica.datajud.cnj.jus.br")
+                throw new DataJudException("Chaves de visitantes s√≥ podem ser enviadas ao endere√ßo oficial do DataJud.", 503);
         }
-
-        var query = new
-        {
-            query = new
-            {
-                term = new Dictionary<string, object> { { "numeroProcesso.keyword", numeroCnj } }
-            },
-            size = 500 // reduzir payload
-        };
-        var content = new StringContent(JsonSerializer.Serialize(query), Encoding.UTF8, "application/json");
-
+        if (apiKey is null && httpClient.DefaultRequestHeaders.Authorization is not { Parameter.Length: > 0 })
+            throw new DataJudException("Configure DataJud:ApiKey com a chave p√∫blica dispon√≠vel na Wiki do CNJ.", 503);
         try
         {
-            var response = await _httpClient.PostAsync(url, content, ct);
-
-            // 401: falta/erro de APIKey
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            using var request = new HttpRequestMessage(HttpMethod.Post, tribunalEndpoint);
+            if (apiKey is not null)
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("APIKey", apiKey);
+            request.Content = JsonContent.Create(new
             {
-                var body401 = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogError("Unauthorized ao consultar CNJ. Verifique DataJud:ApiKey e cabeÁalho Authorization. Body: {body}", body401);
-                return (null, false);
-            }
-
-            // Tratamento explÌcito de sigilo
-            if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.NotFound)
-            {
-                _logger.LogWarning("Processo {numero} com acesso restrito ou n„o encontrado.", numeroCnj);
-                return (null, true);
-            }
-
-            // Demais cÛdigos n„o-sucesso
+                query = new { match = new { numeroProcesso = numeroCnj } }, size = 100,
+                sort = new[] { new { dataHoraUltimaAtualizacao = new { order = "desc" } } }
+            });
+            using var response = await httpClient.SendAsync(request, ct);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                throw new DataJudException("O DataJud recusou o acesso. Confira a chave p√∫blica configurada.", 503);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new DataJudException("Limite do DataJud atingido. Tente novamente mais tarde.", 503);
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync(ct);
-                _logger.LogWarning("Falha ao consultar CNJ para {numero}. Status: {status}. Body: {body}", numeroCnj, (int)response.StatusCode, body);
-                return (null, false);
+                logger.LogWarning("DataJud retornou HTTP {StatusCode}", (int)response.StatusCode);
+                throw new DataJudException("N√£o foi poss√≠vel consultar o tribunal no DataJud. Tente novamente mais tarde.");
             }
-
-            var json = await response.Content.ReadAsStringAsync(ct);
-            // TODO: Mapear schema real do DataJud. MantÈm estrutura mÌnima.
-            var proc = new Processo
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var root = document.RootElement;
+            if ((root.TryGetProperty("timed_out", out var timedOut) && timedOut.ValueKind == JsonValueKind.True) ||
+                (root.TryGetProperty("_shards", out var shards) && shards.TryGetProperty("failed", out var failed) && failed.GetInt32() > 0))
+                throw new DataJudException("O DataJud retornou uma consulta incompleta. Tente novamente.");
+            var sources = root.GetProperty("hits").GetProperty("hits").EnumerateArray()
+                .Select(h => h.GetProperty("_source"))
+                .Where(s => Text(s, "numeroProcesso") == numeroCnj).ToList();
+            if (sources.Count == 0) return (null, false);
+            if (sources.Any(s => !s.TryGetProperty("nivelSigilo", out var level) || !level.TryGetInt32(out var n) || n != 0))
+                return (null, true);
+            var source = sources.OrderByDescending(s => Date(s, "dataHoraUltimaAtualizacao")).First();
+            var movimentos = new List<Movimentacao>();
+            foreach (var s in sources)
+                if (s.TryGetProperty("movimentos", out var array) && array.ValueKind == JsonValueKind.Array)
+                    foreach (var m in array.EnumerateArray())
+                        if (Date(m, "dataHora") is { } data && Text(m, "nome") is { } nome)
+                            movimentos.Add(new Movimentacao { Data = data, Descricao = nome });
+            return (new Processo
             {
-                NumeroCNJ = numeroCnj,
-                Movimentacoes = new List<Movimentacao>()
-            };
-            return (proc, false);
+                NumeroCNJ = numeroCnj, Classe = ObjectName(source, "classe"),
+                OrgaoJulgador = ObjectName(source, "orgaoJulgador"),
+                Assunto = source.TryGetProperty("assuntos", out var assuntos) ? string.Join("; ", Names(assuntos).Distinct()) : null,
+                UltimaAtualizacao = Date(source, "dataHoraUltimaAtualizacao"),
+                Movimentacoes = movimentos.DistinctBy(m => (m.Data, m.Descricao)).OrderByDescending(m => m.Data).ToList()
+            }, false);
         }
-        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            _logger.LogError(ex, "Timeout ao consultar CNJ para {numero}", numeroCnj);
-            return (null, false);
+            throw new DataJudException("O DataJud demorou para responder. Tente novamente.", 504);
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException) { throw new DataJudException("N√£o foi poss√≠vel conectar ao DataJud."); }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
         {
-            _logger.LogError(ex, "Erro HTTP ao consultar CNJ para {numero}", numeroCnj);
-            return (null, false);
+            throw new DataJudException("O DataJud retornou uma resposta em formato inesperado.");
         }
-        catch (Exception ex)
+    }
+
+    private static string? Text(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    private static string? ObjectName(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? Text(v, "nome") : null;
+    private static DateTime? Date(JsonElement e, string name) => DateTimeOffset.TryParse(Text(e, name), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d.UtcDateTime : null;
+    private static IEnumerable<string> Names(JsonElement e)
+    {
+        if (e.ValueKind == JsonValueKind.Array)
         {
-            _logger.LogError(ex, "Erro inesperado ao consultar CNJ para {numero}", numeroCnj);
-            return (null, false);
+            foreach (var child in e.EnumerateArray()) foreach (var name in Names(child)) yield return name;
         }
+        else if (e.ValueKind == JsonValueKind.Object && Text(e, "nome") is { } name) yield return name;
     }
 }

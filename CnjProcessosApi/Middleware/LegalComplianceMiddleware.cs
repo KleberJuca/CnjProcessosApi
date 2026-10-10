@@ -36,9 +36,9 @@ public class LegalComplianceMiddleware
             context.Response.StatusCode = StatusCodes.Status451UnavailableForLegalReasons;
             await context.Response.WriteAsJsonAsync(new
             {
-                error = "Uso n„o permitido por razıes legais",
+                error = "Uso n√£o permitido por raz√µes legais",
                 code = 451,
-                details = "A API est· configurada para uso n„o comercial e foi bloqueada neste ambiente.",
+                details = "A API est√° configurada para uso n√£o comercial e foi bloqueada neste ambiente.",
                 termsOfUse = termsUrl
             });
             return;

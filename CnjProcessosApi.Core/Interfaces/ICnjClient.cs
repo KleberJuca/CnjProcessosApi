@@ -4,5 +4,5 @@ namespace CnjProcessosApi.Core.Interfaces;
 
 public interface ICnjClient
 {
-    Task<(Processo? processo, bool sigiloso)> BuscarProcessoAsync(string numeroCnj, string tribunalEndpoint, CancellationToken ct = default);
+    Task<(Processo? processo, bool sigiloso)> BuscarProcessoAsync(string numeroCnj, string tribunalEndpoint, CancellationToken ct = default, string? apiKey = null);
 }

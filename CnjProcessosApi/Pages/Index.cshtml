@@ -1,94 +1,113 @@
 @page
 @model CnjProcessosApi.Pages.IndexModel
-@{
-    ViewData["Title"] = "Consulta P�blica de Processos";
-}
+@inject IConfiguration Configuration
+@{ ViewData["Title"] = "Consulta pública de processos"; }
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"]</title>
+    <title>@ViewData["Title"] · CnjProcessos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            background: radial-gradient(circle at 20% 0%, #e6f2fb 0, #f7fbff 50%, #f2f6fa 100%);
-        }
-        .glass-panel {
-            backdrop-filter: blur(6px);
-            background: rgba(255, 255, 255, 0.85);
-            border-radius: 12px;
-            box-shadow: 0 1rem 1.5rem rgba(0,0,0,.08);
-            border: 1px solid rgba(0,0,0,.06);
-        }
-        .brand {
-            font-weight: 700;
-            letter-spacing: .5px;
-        }
-        .title {
-            font-family: Georgia, "Times New Roman", serif;
-            font-weight: 700;
-        }
-        .input-group .form-control { height: 3rem; }
-        .btn-search { height: 3rem; }
-        .badge-info-icon {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 28px; height: 28px; border-radius: 50%;
-            background: #0d6efd; color: #fff; font-weight: 700;
-        }
-        .cnj-logo {
-            max-height: 80px;
-            opacity: .9;
-        }
-        footer { font-size: .9rem; color: #6c757d; }
+        body { background: #f3f6fa; color: #183047; font-family: system-ui,sans-serif; margin: 0; }
+        .container { max-width: 960px; margin: auto; padding: 24px; }
+        header { background: #123650; color: white; }
+        header a { color: white; }
+        .panel { background: white; border: 1px solid #dce4ec; border-radius: 16px; padding: 28px; margin: 24px 0; }
+        input { padding: 12px; width: 100%; border: 1px solid #8b9ead; border-radius: 6px; }
+        button { margin-top: 12px; padding: 12px 24px; background: #135e88; color: white; border: 0; border-radius: 6px; }
+        button:disabled { opacity: .6; }
+        .muted { color: #516678; }
+        #status { padding: 12px 0; }
+        .latest { border-left: 4px solid #148570; padding: 12px 18px; background: #eff9f6; }
+        li { padding: 10px 0; }
+        dt { margin-top: 12px; }
+        dd { margin: 0; }
+        footer { font-size: .9rem; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light" style="background:#0d6efd;">
-        <div class="container">
-            <a class="navbar-brand text-white brand" href="/">CnjProcessos API P�blica</a>
-            <span class="navbar-text text-white-50">Consulta cidad�</span>
-        </div>
-    </nav>
-
-    <main class="container py-4">
-        <div class="glass-panel p-4 p-md-5">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="title h2 mb-0">Consulta P�blica de Processos</h1>
-                <img class="cnj-logo" src="/images/logo.png" alt="CNJ" />
-            </div>
-
-            <div class="alert alert-primary d-flex align-items-center" role="alert">
-                <span class="badge-info-icon me-3">i</span>
-                <div>Dados do DataJud 'as is'. Uso gratuito e n�o comercial conforme termos do CNJ.</div>
-            </div>
-
-            <form class="mt-3" method="get" action="/api/processos">
-                <div class="mb-3">
-                    <label for="numero" class="form-label fw-semibold">N�mero CNJ:</label>
-                    <div class="input-group">
-                        <input id="numero" name="filtro" type="text" class="form-control" placeholder="0000000-00.0000.0.00.0000"/>
-                        <button type="submit" class="btn btn-primary btn-search">
-                            <span class="me-2">&#128269;</span> Consultar
-                        </button>
-                    </div>
-                    <div class="form-text">Informe um n�mero CNJ completo para buscar.</div>
-                </div>
+    <header><div class="container d-flex justify-content-between align-items-center">
+        <strong>CnjProcessos</strong><a href="/swagger">Documentação da API</a>
+    </div></header>
+    <main class="container">
+        <section class="panel">
+            <p class="muted">DATAJUD · CONSULTA PÚBLICA</p>
+            <h1>Consulte um processo judicial</h1>
+            <p>Veja os metadados públicos e a última movimentação pelo número CNJ.</p>
+            <form id="consulta">
+                <label for="numero" class="form-label fw-semibold">Número do processo</label>
+                <input id="numero" name="numero" type="text" maxlength="25" required autocomplete="off"
+                       placeholder="0000000-00.0000.0.00.0000" aria-describedby="ajuda" />
+                <small id="ajuda" class="muted">Informe os 20 dígitos, com ou sem pontuação. O tribunal é identificado automaticamente.</small><br />
+                <details class="mt-3">
+                    <summary>Usar minha chave do DataJud (opcional)</summary>
+                    <label for="apiKey">Chave da API pública do DataJud</label>
+                    <input id="apiKey" type="password" maxlength="2048" autocomplete="off" spellcheck="false" />
+                    <small>A chave será enviada ao DataJud somente nesta consulta, sem ser salva. Não informe senha, certificado ou credenciais de PJe/e-SAJ. Ela não libera processos sigilosos.</small>
+                </details>
+                <button id="buscar" type="submit">Consultar processo</button>
             </form>
-
-            <div class="text-center text-muted mt-4">
-                Dados do DataJud 'as is'. Uso gratuito e n�o comercial conforme termos do CNJ.
-            </div>
-        </div>
+            <div id="status" role="status" aria-live="polite"></div>
+        </section>
+        <section id="resultado" class="panel" hidden aria-label="Resultado da consulta">
+            <h2 id="titulo"></h2>
+            <dl><dt>Classe</dt><dd id="classe"></dd><dt>Assunto</dt><dd id="assunto"></dd>
+                <dt>Órgão julgador</dt><dd id="orgao"></dd><dt>Consultado no DataJud em</dt><dd id="atualizacao"></dd></dl>
+            <div class="latest"><h3>Última movimentação</h3><p id="ultima"></p></div>
+            <h3 class="mt-4">Movimentações disponíveis</h3>
+            <ol id="movimentos"></ol><p id="disclaimer" class="muted"></p>
+        </section>
+        <footer>
+            <p>@Configuration["Legal:Disclaimer"]</p>
+            <p>O DataJud pode ter atraso de atualização. Confirme prazos e informações no tribunal de origem.
+               Esta ferramenta independente não é um serviço oficial do CNJ.</p>
+            <a href="https://datajud-wiki.cnj.jus.br/api-publica/termo-uso/" target="_blank" rel="noopener noreferrer">Termo de Uso do CNJ</a>
+            <p>© @DateTime.UtcNow.Year CnjProcessos · Código aberto sob licença MIT</p>
+        </footer>
     </main>
-
-    <footer class="container py-4">
-        <div class="d-flex justify-content-between">
-            <span>� @DateTime.Now.Year CnjProcessos � Open Source (MIT)</span>
-            <a class="link-secondary" href="https://datajud-wiki.cnj.jus.br/api-publica/termo-de-uso" target="_blank">Termo de Uso do CNJ</a>
-        </div>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const form = document.getElementById('consulta');
+        const statusBox = document.getElementById('status');
+        const button = document.getElementById('buscar');
+        const result = document.getElementById('resultado');
+        const put = (id, value) => document.getElementById(id).textContent = value || 'Não informado';
+        const date = value => value ? new Date(value).toLocaleString('pt-BR') : 'Não informado';
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            result.hidden = true;
+            button.disabled = true;
+            statusBox.textContent = 'Consultando o DataJud. Isso pode levar alguns segundos…';
+            try {
+                const number = document.getElementById('numero').value.trim();
+                const apiKey = document.getElementById('apiKey').value.trim();
+                document.getElementById('apiKey').value = '';
+                const response = await fetch('/api/processos/consulta', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numeroCNJ: number, apiKey: apiKey || null }),
+                    cache: 'no-store'
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || data.message || 'Não foi possível consultar o processo.');
+                put('titulo', data.numeroCNJ);
+                put('classe', data.classe); put('assunto', data.assunto); put('orgao', data.orgaoJulgador);
+                put('atualizacao', date(data.ultimaAtualizacao));
+                put('ultima', data.ultimaMovimentacao ? date(data.ultimaMovimentacao.data) + ' — ' + data.ultimaMovimentacao.descricao : 'Nenhuma movimentação disponível.');
+                const list = document.getElementById('movimentos');
+                list.replaceChildren();
+                for (const movement of data.movimentacoes || []) {
+                    const item = document.createElement('li');
+                    item.textContent = date(movement.data) + ' — ' + movement.descricao;
+                    list.appendChild(item);
+                }
+                put('disclaimer', data.disclaimer);
+                result.hidden = false;
+                statusBox.textContent = 'Consulta concluída.';
+            } catch (error) {
+                statusBox.textContent = error.message || 'Falha de conexão. Tente novamente.';
+            } finally { button.disabled = false; }
+        });
+    </script>
 </body>
 </html>

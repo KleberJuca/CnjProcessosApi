@@ -9,7 +9,7 @@ public class Processo
     public string? OrgaoJulgador { get; set; }
     public bool IsSigiloso { get; set; }
     public DateTime? UltimaAtualizacao { get; set; }
-    // Campo opcional com nomes anonimizados (ex.: iniciais), nunca dados sensíveis
+    // Campo opcional com nomes anonimizados (ex.: iniciais), nunca dados sensÃ­veis
     public string? NomePartesAnonimizados { get; set; }
     public ICollection<Movimentacao> Movimentacoes { get; set; } = new List<Movimentacao>();
 }

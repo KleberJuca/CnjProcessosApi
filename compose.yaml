@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DataJud__ApiKey: ${DATAJUD_API_KEY:?Defina DATAJUD_API_KEY no arquivo .env}
+      ConnectionStrings__DefaultConnection: Data Source=/data/processos.db
+      Swagger__Enabled: "true"
+    volumes:
+      - processos:/data
+volumes:
+  processos:

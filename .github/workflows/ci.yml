@@ -1,0 +1,22 @@
+name: Verificar projeto
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet test CnjProcessosApi.sln --configuration Release
+      - run: dotnet publish CnjProcessosApi/CnjProcessosApi.csproj --configuration Release --no-restore
+  online:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --experimental-strip-types --test online/tests/*.test.mjs

@@ -6,106 +6,104 @@ using Microsoft.Extensions.Configuration;
 
 namespace CnjProcessosApi.Core.Services;
 
-public class ProcessoService : IProcessoService
+public class ProcessoService(IProcessoRepository repo, ICnjClient cnjClient, ILogger<ProcessoService> logger, IConfiguration config) : IProcessoService
 {
-    private readonly IProcessoRepository _repo;
-    private readonly ICnjClient _cnjClient;
-    private readonly ILogger<ProcessoService> _logger;
-    private readonly IConfiguration _config;
+    // Serialize refreshes within this single-instance SQLite application.
+    private static readonly SemaphoreSlim RefreshLock = new(1, 1);
 
-    public ProcessoService(IProcessoRepository repo, ICnjClient cnjClient, ILogger<ProcessoService> logger, IConfiguration config)
+    public async Task<ProcessoResponseDto?> GetDetalheAsync(string numeroCnj, CancellationToken ct = default, string? apiKey = null)
     {
-        _repo = repo;
-        _cnjClient = cnjClient;
-        _logger = logger;
-        _config = config;
-    }
-
-    public async Task<ProcessoResponseDto?> GetDetalheAsync(string numeroCnj, CancellationToken ct = default)
-    {
-        var proc = await _repo.GetByNumeroAsync(numeroCnj, ct);
-        if (proc == null) return null;
-        var dto = MapWithUltimaMov(proc);
-        dto.Disclaimer = _config["Legal:Disclaimer"] ?? dto.Disclaimer;
-        return dto;
+        numeroCnj = NumeroCnj.Normalizar(numeroCnj);
+        var endpoint = NumeroCnj.Tribunal(numeroCnj);
+        if (apiKey is not null)
+        {
+            // Visitor credentials and their responses never enter the shared cache.
+            var (personal, restricted) = await cnjClient.BuscarProcessoAsync(numeroCnj, endpoint, ct, apiKey);
+            if (personal is null || restricted) return null;
+            foreach (var movement in personal.Movimentacoes) movement.Descricao = Anon(movement.Descricao);
+            personal.UltimaAtualizacao = DateTime.UtcNow;
+            return Map(personal);
+        }
+        await RefreshLock.WaitAsync(ct);
+        try
+        {
+            var proc = await repo.GetByNumeroAsync(numeroCnj, ct);
+            var ttl = int.TryParse(config["DataJud:CacheMinutes"], out var minutes) ? Math.Clamp(minutes, 0, 1440) : 60;
+            if (proc == null || proc.UltimaAtualizacao == null || proc.UltimaAtualizacao < DateTime.UtcNow.AddMinutes(-ttl))
+                proc = await AtualizarAsync(numeroCnj, endpoint, ct);
+            return proc is null || proc.IsSigiloso ? null : Map(proc);
+        }
+        finally { RefreshLock.Release(); }
     }
 
     public async Task<(IEnumerable<ProcessoResponseDto> items, int total)> GetListaAsync(int page, int pageSize, string? filtroNumero = null, CancellationToken ct = default)
     {
-        var (items, total) = await _repo.GetPagedAsync(page, pageSize, filtroNumero, ct);
-        var mapped = items.Select(p => {
-            var dto = MapWithUltimaMov(p);
-            dto.Disclaimer = _config["Legal:Disclaimer"] ?? dto.Disclaimer;
-            return dto;
-        });
-        return (mapped, total);
+        if (page < 1 || page > 1000000 || pageSize < 1 || pageSize > 100)
+            throw new ArgumentException("Use page entre 1 e 1000000 e pageSize entre 1 e 100.");
+        if (!string.IsNullOrWhiteSpace(filtroNumero))
+        {
+            filtroNumero = filtroNumero.Trim().Replace(".", "").Replace("-", "");
+            if (filtroNumero.Length > 20 || filtroNumero.Any(c => c is < '0' or > '9'))
+                throw new ArgumentException("O filtro deve conter at√© 20 d√≠gitos do n√∫mero CNJ.");
+        }
+        var (items, total) = await repo.GetPagedAsync(page, pageSize, filtroNumero, ct);
+        return (items.Select(Map).ToList(), total);
     }
 
     public async Task SyncAsync(IEnumerable<string> numerosCnj, string tribunalEndpoint, CancellationToken ct = default)
     {
-        foreach (var numero in numerosCnj)
+        // Validate the whole batch before making external requests.
+        var numeros = numerosCnj.Select(NumeroCnj.Normalizar).Distinct().ToArray();
+        var consultas = numeros.Select(n => (Numero: n, Endpoint: NumeroCnj.Tribunal(n))).ToArray();
+        await RefreshLock.WaitAsync(ct);
+        try
         {
-            try
+            foreach (var consulta in consultas)
             {
-                var result = await _cnjClient.BuscarProcessoAsync(numero, tribunalEndpoint, ct);
-                var procFromCnj = result.processo;
-                var sigiloso = result.sigiloso;
-                if (sigiloso)
-                {
-                    // N„o persistir detalhes, apenas marcar sigilo se j· existir registro
-                    var existing = await _repo.GetByNumeroAsync(numero, ct);
-                    if (existing != null)
-                    {
-                        existing.IsSigiloso = true;
-                        existing.UltimaAtualizacao = DateTime.UtcNow;
-                        await _repo.AddOrUpdateAsync(existing, ct);
-                    }
-                    continue;
-                }
-                if (procFromCnj != null)
-                {
-                    // Ordenar movimentaÁıes desc e anonimizar possÌveis nomes nas descriÁıes se aplic·vel
-                    procFromCnj.Movimentacoes = procFromCnj.Movimentacoes
-                        .OrderByDescending(m => m.Data)
-                        .Select(m => new Movimentacao { Data = m.Data, Descricao = Anon(m.Descricao), ProcessoId = procFromCnj.Id, Processo = procFromCnj })
-                        .ToList();
-                    procFromCnj.UltimaAtualizacao = DateTime.UtcNow;
-                    procFromCnj.NomePartesAnonimizados = null; // manter vazio por padr„o
-                    await _repo.AddOrUpdateAsync(procFromCnj, ct);
-                }
+                ct.ThrowIfCancellationRequested();
+                await AtualizarAsync(consulta.Numero, consulta.Endpoint, ct);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao sincronizar processo {numero}", numero);
-            }
+            logger.LogInformation("Sincroniza√ß√£o conclu√≠da: {Count} consultas", consultas.Length);
         }
+        finally { RefreshLock.Release(); }
     }
 
-    private ProcessoResponseDto MapWithUltimaMov(Processo p)
+    private async Task<Processo?> AtualizarAsync(string numero, string endpoint, CancellationToken ct)
     {
-        var movs = p.Movimentacoes.OrderByDescending(m => m.Data)
-            .Select(m => new MovimentacaoDto { Data = m.Data, Descricao = m.Descricao })
-            .ToList();
-        var dto = new ProcessoResponseDto
+        var (proc, sigiloso) = await cnjClient.BuscarProcessoAsync(numero, endpoint, ct);
+        if (sigiloso || proc == null)
         {
-            NumeroCNJ = p.NumeroCNJ,
-            Classe = p.Classe,
-            Assunto = p.Assunto,
-            OrgaoJulgador = p.OrgaoJulgador,
-            IsSigiloso = p.IsSigiloso,
-            UltimaAtualizacao = p.UltimaAtualizacao,
-            Movimentacoes = movs
-        };
-        dto.UltimaMovimentacao = movs.FirstOrDefault();
-        return dto;
+            // Remove cached details when a previously public record disappears or becomes restricted.
+            await repo.RemoveAsync(numero, ct);
+            return null;
+        }
+        proc.Movimentacoes = proc.Movimentacoes.Select(m => new Movimentacao
+        {
+            Data = m.Data, Descricao = Anon(m.Descricao)
+        }).ToList();
+        proc.UltimaAtualizacao = DateTime.UtcNow;
+        proc.NomePartesAnonimizados = null;
+        await repo.AddOrUpdateAsync(proc, ct);
+        return proc;
     }
 
-    private string Anon(string text)
+    private ProcessoResponseDto Map(Processo p)
     {
-        if (string.IsNullOrWhiteSpace(text)) return text;
-        // EstratÈgia simples: mascarar padrıes de CPF/CNPJ (n„o armazenar) e suprimir nomes entre aspas
-        var masked = System.Text.RegularExpressions.Regex.Replace(text, @"\b\d{3}\.\d{3}\.\d{3}\-\d{2}\b", "***CPF***");
-        masked = System.Text.RegularExpressions.Regex.Replace(masked, @"\b\d{2}\.\d{3}\.\d{3}\/(\d{4})\-\d{2}\b", "***CNPJ***");
-        return masked;
+        var movimentos = p.Movimentacoes.OrderByDescending(m => m.Data)
+            .Select(m => new MovimentacaoDto { Data = m.Data, Descricao = m.Descricao }).ToList();
+        return new ProcessoResponseDto
+        {
+            NumeroCNJ = p.NumeroCNJ, Classe = p.Classe, Assunto = p.Assunto,
+            OrgaoJulgador = p.OrgaoJulgador, IsSigiloso = false,
+            UltimaAtualizacao = p.UltimaAtualizacao, Movimentacoes = movimentos,
+            UltimaMovimentacao = movimentos.FirstOrDefault(),
+            Disclaimer = config["Legal:Disclaimer"] ?? "Metadados p√∫blicos do DataJud. Confira as informa√ß√µes no tribunal de origem."
+        };
+    }
+
+    private static string Anon(string text)
+    {
+        var masked = System.Text.RegularExpressions.Regex.Replace(text, @"\b(?:\d{3}\.?){2}\d{3}-?\d{2}\b", "***CPF***");
+        return System.Text.RegularExpressions.Regex.Replace(masked, @"\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b", "***CNPJ***");
     }
 }

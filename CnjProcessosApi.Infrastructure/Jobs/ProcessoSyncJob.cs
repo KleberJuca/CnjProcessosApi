@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace CnjProcessosApi.Infrastructure.Jobs;
 
+[DisallowConcurrentExecution]
 public class ProcessoSyncJob : IJob
 {
     private readonly IConfiguration _config;

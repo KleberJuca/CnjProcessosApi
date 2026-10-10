@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CnjProcessosApi.Core", "Cnj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CnjProcessosApi.Infrastructure", "CnjProcessosApi.Infrastructure\CnjProcessosApi.Infrastructure.csproj", "{259BA1A4-CE77-4D11-A035-E7B378993813}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CnjProcessosApi.Tests", "CnjProcessosApi.Tests\CnjProcessosApi.Tests.csproj", "{063EB6AB-01E9-4E74-B580-575002481E3A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{259BA1A4-CE77-4D11-A035-E7B378993813}.Release|x64.Build.0 = Release|Any CPU
 		{259BA1A4-CE77-4D11-A035-E7B378993813}.Release|x86.ActiveCfg = Release|Any CPU
 		{259BA1A4-CE77-4D11-A035-E7B378993813}.Release|x86.Build.0 = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|x64.Build.0 = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Debug|x86.Build.0 = Debug|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|x64.ActiveCfg = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|x64.Build.0 = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|x86.ActiveCfg = Release|Any CPU
+		{063EB6AB-01E9-4E74-B580-575002481E3A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

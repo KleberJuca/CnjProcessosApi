@@ -1,0 +1,11 @@
+.git
+**/bin
+**/obj
+**/Logs
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.env
+TestResults
+
+online/

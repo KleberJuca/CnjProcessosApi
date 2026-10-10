@@ -16,5 +16,5 @@ public class ProcessoResponseDto
     public DateTime? UltimaAtualizacao { get; set; }
     public MovimentacaoDto? UltimaMovimentacao { get; set; }
     public IEnumerable<MovimentacaoDto> Movimentacoes { get; set; } = Enumerable.Empty<MovimentacaoDto>();
-    public string Disclaimer { get; set; } = "Dados do DataJud 'as is'. Uso gratuito e n„o comercial conforme termos do CNJ.";
+    public string Disclaimer { get; set; } = "Dados do DataJud 'as is'. Uso gratuito e n√£o comercial conforme termos do CNJ.";
 }
