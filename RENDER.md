@@ -1,5 +1,11 @@
 # Publicação gratuita no Render
 
+Portal publicado: https://cnjprocessos-kleberjuca.onrender.com
+
+A publicação atual usa o repositório público e foi configurada no painel.
+Para atualizar o código no serviço, use **Manual Deploy → Deploy latest commit**
+no Render. O Blueprint abaixo permite reproduzir a configuração em outro serviço.
+
 O arquivo `render.yaml` prepara a aplicação .NET 8 com formulário, chave opcional
 do visitante e API em um serviço Docker com plano explicitamente `free`.
 O Render atribui um endereço HTTPS terminado em `onrender.com` após a criação.

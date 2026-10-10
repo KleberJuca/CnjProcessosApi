@@ -6,9 +6,11 @@ O uso dos dados deve observar o [Termo de Uso do CNJ](https://datajud-wiki.cnj.j
 
 ## Versão online
 
-Portal: https://cnjprocessos-kleberjuca.aglowpixie3.chatgpt.site
+Portal: https://cnjprocessos-kleberjuca.onrender.com
 
-A pasta [online](online/README.md) contém a adaptação Vinext/Cloudflare Workers para hospedagem Sites. O backend original ASP.NET Core 8 continua nos projetos desta solução. A versão online faz consultas sob demanda, sem persistir resultados ou histórico e sem os jobs Quartz do backend .NET; D1 guarda apenas o controle global de frequência.
+O portal principal executa a aplicação ASP.NET Core 8 no plano gratuito do Render. Após 15 minutos sem visitas, o serviço pode entrar em repouso; o próximo acesso pode levar cerca de um minuto ou mais. O SQLite é um cache descartável, recriado após reinícios. Veja [a configuração da hospedagem](RENDER.md).
+
+A pasta [online](online/README.md) preserva a adaptação alternativa Vinext/Cloudflare Workers para Sites; ela não é usada na publicação .NET do Render.
 
 O portal permite consultas públicas sem cadastro e oferece um campo opcional para a chave da API pública do DataJud. O serviço permanece sujeito à disponibilidade e aos limites da hospedagem e do CNJ.
 
