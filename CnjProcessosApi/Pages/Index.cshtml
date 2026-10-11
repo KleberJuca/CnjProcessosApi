@@ -1,113 +1,44 @@
 @page
 @model CnjProcessosApi.Pages.IndexModel
-@inject IConfiguration Configuration
-@{ ViewData["Title"] = "Consulta pública de processos"; }
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] · CnjProcessos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f3f6fa; color: #183047; font-family: system-ui,sans-serif; margin: 0; }
-        .container { max-width: 960px; margin: auto; padding: 24px; }
-        header { background: #123650; color: white; }
-        header a { color: white; }
-        .panel { background: white; border: 1px solid #dce4ec; border-radius: 16px; padding: 28px; margin: 24px 0; }
-        input { padding: 12px; width: 100%; border: 1px solid #8b9ead; border-radius: 6px; }
-        button { margin-top: 12px; padding: 12px 24px; background: #135e88; color: white; border: 0; border-radius: 6px; }
-        button:disabled { opacity: .6; }
-        .muted { color: #516678; }
-        #status { padding: 12px 0; }
-        .latest { border-left: 4px solid #148570; padding: 12px 18px; background: #eff9f6; }
-        li { padding: 10px 0; }
-        dt { margin-top: 12px; }
-        dd { margin: 0; }
-        footer { font-size: .9rem; }
-    </style>
-</head>
-<body>
-    <header><div class="container d-flex justify-content-between align-items-center">
-        <strong>CnjProcessos</strong><a href="/swagger">Documentação da API</a>
-    </div></header>
-    <main class="container">
-        <section class="panel">
-            <p class="muted">DATAJUD · CONSULTA PÚBLICA</p>
-            <h1>Consulte um processo judicial</h1>
-            <p>Veja os metadados públicos e a última movimentação pelo número CNJ.</p>
-            <form id="consulta">
-                <label for="numero" class="form-label fw-semibold">Número do processo</label>
-                <input id="numero" name="numero" type="text" maxlength="25" required autocomplete="off"
-                       placeholder="0000000-00.0000.0.00.0000" aria-describedby="ajuda" />
-                <small id="ajuda" class="muted">Informe os 20 dígitos, com ou sem pontuação. O tribunal é identificado automaticamente.</small><br />
-                <details class="mt-3">
-                    <summary>Usar minha chave do DataJud (opcional)</summary>
-                    <label for="apiKey">Chave da API pública do DataJud</label>
-                    <input id="apiKey" type="password" maxlength="2048" autocomplete="off" spellcheck="false" />
-                    <small>A chave será enviada ao DataJud somente nesta consulta, sem ser salva. Não informe senha, certificado ou credenciais de PJe/e-SAJ. Ela não libera processos sigilosos.</small>
-                </details>
-                <button id="buscar" type="submit">Consultar processo</button>
-            </form>
-            <div id="status" role="status" aria-live="polite"></div>
-        </section>
-        <section id="resultado" class="panel" hidden aria-label="Resultado da consulta">
-            <h2 id="titulo"></h2>
-            <dl><dt>Classe</dt><dd id="classe"></dd><dt>Assunto</dt><dd id="assunto"></dd>
-                <dt>Órgão julgador</dt><dd id="orgao"></dd><dt>Consultado no DataJud em</dt><dd id="atualizacao"></dd></dl>
-            <div class="latest"><h3>Última movimentação</h3><p id="ultima"></p></div>
-            <h3 class="mt-4">Movimentações disponíveis</h3>
-            <ol id="movimentos"></ol><p id="disclaimer" class="muted"></p>
-        </section>
-        <footer>
-            <p>@Configuration["Legal:Disclaimer"]</p>
-            <p>O DataJud pode ter atraso de atualização. Confirme prazos e informações no tribunal de origem.
-               Esta ferramenta independente não é um serviço oficial do CNJ.</p>
-            <a href="https://datajud-wiki.cnj.jus.br/api-publica/termo-uso/" target="_blank" rel="noopener noreferrer">Termo de Uso do CNJ</a>
-            <p>© @DateTime.UtcNow.Year CnjProcessos · Código aberto sob licença MIT</p>
-        </footer>
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Consulta pública de processos · CnjProcessos</title><link rel="stylesheet" href="/css/portal.css?v=2"/></head><body>
+    <header class="topbar"><a class="brand" href="/" aria-label="CnjProcessos início"><span class="brand-icon" aria-hidden="true">§</span>Cnj<span>Processos</span></a><nav><a href="#como-funciona">Como funciona</a><a href="https://github.com/KleberJuca/CnjProcessosApi" target="_blank" rel="noreferrer">Código aberto ↗</a></nav></header>
+    <main>
+      <section class="hero">
+        <div class="eyebrow"><span></span> INFORMAÇÃO JUDICIAL, ACESSÍVEL</div>
+        <h1>Seu processo,<br/><em>mais fácil de consultar.</em></h1>
+        <p class="intro">Metadados e movimentações públicas em um só lugar.<br class="desktop"/> Para cidadãos, estudantes e profissionais do Direito.</p>
+        <div class="trust"><span>Sem cadastro</span><i></i> <span>Gratuito</span><i></i> <span>Dados do DataJud / CNJ</span></div>
+      </section>
+      <div class="workspace">
+        <section class="query-card">
+          <div class="card-heading"><span class="step">01</span><div><h2>Consultar processo</h2><p>O tribunal é identificado pelo número informado.</p></div></div>
+          <form id="consulta">
+            <label for="numero">Número CNJ</label>
+            <input id="numero" name="numeroCNJ" placeholder="0000000-00.0000.0.00.0000" maxlength={25} required autocomplete="off" aria-describedby="number-help"/>
+            <p id="number-help" class="helper">20 dígitos, com ou sem pontuação.</p>
+            <details class="key-options"><summary>Tenho uma chave do DataJud <span>Opcional</span></summary><div>
+              <label for="api-key">Chave da API pública do DataJud</label>
+              <input id="api-key" type="password" maxlength={2048} autocomplete="off" spellcheck="false" placeholder="Cole sua APIKey" aria-describedby="key-help"/>
+              <p id="key-help">A chave será usada só nesta consulta e o campo será limpo ao enviar. Não salvamos a chave no banco ou no navegador. Não informe senha de tribunal, certificado digital ou credenciais do PJe/e-SAJ.</p>
+              <p>Ser advogado ou informar outra chave não libera processos sigilosos. Este serviço consulta somente a API pública do DataJud.</p>
+              <a href="https://datajud-wiki.cnj.jus.br/api-publica/acesso/" target="_blank" rel="noreferrer">Consultar a chave pública na Wiki do CNJ ↗</a>
+            </div></details>
+            <button id="buscar" class="primary" type="submit"><span id="button-label">Consultar processo</span><span aria-hidden="true">→</span></button>
+            <p class="privacy-note">A consulta é enviada ao DataJud. Dados públicos podem ficar em cache temporário; sua chave não é salva.</p>
+          </form>
+          <p id="status" class="status" role="status" aria-live="polite"></p><div id="error" class="error" role="alert" hidden><strong>Não foi possível concluir</strong><p id="error-text"></p></div>
+</section>
+        <aside class="guide" id="como-funciona"><p class="small-label">ANTES DE CONSULTAR</p><h2>Informação pública.<br/>Sem complicação.</h2>
+          <ol><li><span>1</span><div><strong>Informe o número</strong><p>Use a numeração única CNJ do processo que deseja consultar.</p></div></li><li><span>2</span><div><strong>Consulte a fonte</strong><p>A busca é feita na base pública do DataJud, no tribunal correspondente.</p></div></li><li><span>3</span><div><strong>Veja os movimentos</strong><p>Confira a última movimentação e os metadados disponíveis.</p></div></li></ol>
+          <div class="notice"><strong>Uma consulta não substitui o tribunal.</strong><p>O DataJud pode apresentar atraso ou não incluir um processo. Confira prazos e documentos no sistema de origem.</p></div>
+        </aside>
+      </div>
+      <section id="resultado" class="result" hidden aria-label="Resultado da consulta">
+<div class="result-top"><div><p class="small-label"><span class="success-dot"></span> CONSULTA CONCLUÍDA</p><h2 id="titulo"></h2></div><button id="print" class="secondary" type="button">Imprimir resultado</button></div>
+<dl class="metadata"><div><dt>CLASSE PROCESSUAL</dt><dd id="classe"></dd></div><div><dt>ÓRGÃO JULGADOR</dt><dd id="orgao"></dd></div><div class="full"><dt>ASSUNTO</dt><dd id="assunto"></dd></div></dl>
+<div class="latest"><span class="small-label">ÚLTIMA MOVIMENTAÇÃO DISPONÍVEL</span><h3 id="ultima"></h3><time id="ultima-data"></time></div>
+<div class="history-heading"><h3>Histórico de movimentações</h3><span id="count"></span></div><ol id="movimentos" class="timeline"></ol><button id="expand" class="secondary" type="button" hidden>Ver todas as movimentações</button>
+<div class="result-foot"><p id="atualizacao"></p><p id="disclaimer"></p></div></section><section class="faq"><h2>Perguntas frequentes</h2><details><summary>Preciso ser advogado para consultar?</summary><p>Não. A consulta de metadados públicos está disponível a qualquer pessoa, sem cadastro. Advogados usam a mesma base pública neste serviço.</p></details><details><summary>Por que um processo pode não aparecer?</summary><p>Ele pode não constar da base pública, estar com dados ainda não enviados pelo tribunal ou ter restrições de acesso. A ausência de resultado não permite concluir que há sigilo.</p></details><details><summary>Como os meus dados são tratados?</summary><p>O número CNJ e a chave opcional passam pelo servidor para consultar o endereço oficial do DataJud. A aplicação não grava sua chave. Resultados públicos podem ficar em cache temporário no servidor; consultas com chave própria não são salvas nesse cache. A hospedagem pode manter registros técnicos de acesso. Consulte também os termos do CNJ.</p></details><details><summary>Posso integrar pela API?</summary><p><a href="/swagger">Consulte a documentação da API</a>. Envie POST para /api/processos/consulta com JSON: numeroCNJ e, opcionalmente, apiKey. As respostas são JSON. Este serviço não oferece busca por nome, CPF, documentos ou acesso privado. O limite de saída é compartilhado; respostas 429 pedem uma nova tentativa mais tarde.</p></details></section>
     </main>
-    <script>
-        const form = document.getElementById('consulta');
-        const statusBox = document.getElementById('status');
-        const button = document.getElementById('buscar');
-        const result = document.getElementById('resultado');
-        const put = (id, value) => document.getElementById(id).textContent = value || 'Não informado';
-        const date = value => value ? new Date(value).toLocaleString('pt-BR') : 'Não informado';
-        form.addEventListener('submit', async event => {
-            event.preventDefault();
-            result.hidden = true;
-            button.disabled = true;
-            statusBox.textContent = 'Consultando o DataJud. Isso pode levar alguns segundos…';
-            try {
-                const number = document.getElementById('numero').value.trim();
-                const apiKey = document.getElementById('apiKey').value.trim();
-                document.getElementById('apiKey').value = '';
-                const response = await fetch('/api/processos/consulta', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ numeroCNJ: number, apiKey: apiKey || null }),
-                    cache: 'no-store'
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || data.message || 'Não foi possível consultar o processo.');
-                put('titulo', data.numeroCNJ);
-                put('classe', data.classe); put('assunto', data.assunto); put('orgao', data.orgaoJulgador);
-                put('atualizacao', date(data.ultimaAtualizacao));
-                put('ultima', data.ultimaMovimentacao ? date(data.ultimaMovimentacao.data) + ' — ' + data.ultimaMovimentacao.descricao : 'Nenhuma movimentação disponível.');
-                const list = document.getElementById('movimentos');
-                list.replaceChildren();
-                for (const movement of data.movimentacoes || []) {
-                    const item = document.createElement('li');
-                    item.textContent = date(movement.data) + ' — ' + movement.descricao;
-                    list.appendChild(item);
-                }
-                put('disclaimer', data.disclaimer);
-                result.hidden = false;
-                statusBox.textContent = 'Consulta concluída.';
-            } catch (error) {
-                statusBox.textContent = error.message || 'Falha de conexão. Tente novamente.';
-            } finally { button.disabled = false; }
-        });
-    </script>
-</body>
-</html>
+    <footer><div><a class="brand" href="/">Cnj<span>Processos</span></a><p>Projeto independente de Kleber Jucá.<br/>Uso gratuito e não comercial. Sem vínculo oficial com o CNJ.</p></div><div><a href="https://datajud-wiki.cnj.jus.br/api-publica/termo-uso/" target="_blank" rel="noreferrer">Termos do DataJud ↗</a><a href="https://github.com/KleberJuca/CnjProcessosApi" target="_blank" rel="noreferrer">Projeto no GitHub ↗</a><span>Código aberto · MIT</span></div></footer>
+<script src="/js/portal.js?v=2" defer></script></body></html>
